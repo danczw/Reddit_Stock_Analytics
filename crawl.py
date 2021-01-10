@@ -27,12 +27,12 @@ subs = ['wallstreetbets', 'stocks', 'Finanzen', 'mauerstrassenwetten']
 # define dataframe for submissions meta data # submission title
 subm_col_header = ['crawl_datetime', 'sub', 'submission', 'submission_id',
                     'stickied', 'num_comments']
-sra_subm_df = pd.DataFrame(columns=subm_col_header)
+rsa_subm_df = pd.DataFrame(columns=subm_col_header)
 
 # define dataframe for comments meta data + comment body
 comments_col_header = ['crawl_datetime', 'submission_id', 'comment_id',
                     'created_utc', 'body', 'score']
-sra_comments_df = pd.DataFrame(columns=comments_col_header)
+rsa_comments_df = pd.DataFrame(columns=comments_col_header)
 
 for s in subs:
     for submission in reddit.subreddit(s).hot(limit=submission_limit):
@@ -48,7 +48,7 @@ for s in subs:
             subm_list.append(submission.num_comments)
             # save submission meta data to df
             temp_df = pd.DataFrame([subm_list], columns=subm_col_header)
-            sra_subm_df = sra_subm_df.append(temp_df)
+            rsa_subm_df = rsa_subm_df.append(temp_df)
             
             submission.comments.replace_more(limit=None) # get whole CommentForest
             for comment in submission.comments.list():
@@ -63,8 +63,8 @@ for s in subs:
                 comments_list.append(comment.score)
                 # save comment to df
                 temp_df = pd.DataFrame([comments_list], columns=comments_col_header)
-                sra_comments_df = sra_comments_df.append(temp_df)
+                rsa_comments_df = rsa_comments_df.append(temp_df)
 
 # save dfs
-sra_subm_df.to_csv('submissions.csv', index=False)
-sra_comments_df.to_csv('comments.csv', index=False)
+rsa_subm_df.to_csv('submissions.csv', index=False)
+rsa_comments_df.to_csv('comments.csv', index=False)
