@@ -3,26 +3,26 @@ Python script to crawl submissions and all their comments from specified
 subreddits using reddits praw API
 '''
 
-import praw
-from praw.models import MoreComments
-import pandas as pd
+from azure.storage.blob import BlobServiceClient
+import config
 from datetime import datetime
 from datetime import date
-import config
+import pandas as pd
+import praw
 
 # config vars
 current_Time = datetime.now()
 current_date = date.today().strftime(r"%Y%m%d")
-submission_limit = 5 # set number of submissions crawled per subreddit
+submission_limit = 2 # set number of submissions crawled per subreddit
 
 # set reddit instance
 reddit = praw.Reddit(
     client_id = config.client_id
     , client_secret = config.client_secret
-    , user_agent = config.user_agent
-)
+    , user_agent = config.user_agent)
 # define subreddits to be crawled
-subs = ['wallstreetbets', 'stocks', 'Finanzen', 'mauerstrassenwetten']
+subs = ['wallstreetbets'] # , 'stocks', 'Finanzen', 'mauerstrassenwetten'
+
 
 # define dataframe for submissions meta data # submission title
 subm_col_header = ['crawl_datetime', 'sub', 'submission', 'submission_id',
@@ -36,7 +36,7 @@ rsa_comments_df = pd.DataFrame(columns=comments_col_header)
 
 for s in subs:
     for submission in reddit.subreddit(s).hot(limit=submission_limit):
-        if not submission.stickied: # stickied are currently filtered out
+        if not submission.stickied: # TODO: stickied are currently filtered out
             # initialize list for current submission and append meta data
             subm_list = []
             subm_list.append(current_Time)
@@ -68,3 +68,11 @@ for s in subs:
 # save dfs
 rsa_subm_df.to_csv('submissions.csv', index=False)
 rsa_comments_df.to_csv('comments.csv', index=False)
+
+# azure blob config var
+blob_service_client = BlobServiceClient.from_connection_string(config.storage_string)
+blob_client = blob_service_client.get_blob_client(container=config.container_name, blob='submissions.csv')
+
+# upload to blob
+with open('submissions.csv', "rb") as data:
+    blob_client.upload_blob(data)
