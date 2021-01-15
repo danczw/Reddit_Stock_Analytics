@@ -3,11 +3,11 @@ Python script to crawl submissions and all their comments from specified
 subreddits using reddits praw API
 '''
 
-from azure.storage.blob import BlobServiceClient
 import config
 from datetime import datetime
 from datetime import date
 import pandas as pd
+import pyodbc
 import praw
 
 # config vars
@@ -19,60 +19,63 @@ submission_limit = 2 # set number of submissions crawled per subreddit
 reddit = praw.Reddit(
     client_id = config.client_id
     , client_secret = config.client_secret
-    , user_agent = config.user_agent)
+    , user_agent = config.user_agent
+)
 # define subreddits to be crawled
 subs = ['wallstreetbets'] # , 'stocks', 'Finanzen', 'mauerstrassenwetten'
 
-
-# define dataframe for submissions meta data # submission title
-subm_col_header = ['crawl_datetime', 'sub', 'submission', 'submission_id',
-                    'stickied', 'num_comments']
-rsa_subm_df = pd.DataFrame(columns=subm_col_header)
-
 # define dataframe for comments meta data + comment body
-comments_col_header = ['crawl_datetime', 'submission_id', 'comment_id',
-                    'created_utc', 'body', 'score']
-rsa_comments_df = pd.DataFrame(columns=comments_col_header)
+col_header = [
+    'crawl_datetime', 'subreddit', 'submission', 'submission_id', 'stickied',
+    'comment_id', 'created_utc', 'body', 'score'
+]
+rsa_df = pd.DataFrame(columns=col_header)
 
 for s in subs:
     for submission in reddit.subreddit(s).hot(limit=submission_limit):
         if not submission.stickied: # TODO: stickied are currently filtered out
-            # initialize list for current submission and append meta data
-            subm_list = []
-            subm_list.append(current_Time)
-            subm_list.append(s)
-            # TODO: fix encoding
-            subm_list.append(submission.title.lower())
-            subm_list.append(submission.id)
-            subm_list.append(submission.stickied)
-            subm_list.append(submission.num_comments)
-            # save submission meta data to df
-            temp_df = pd.DataFrame([subm_list], columns=subm_col_header)
-            rsa_subm_df = rsa_subm_df.append(temp_df)
-            
+
             submission.comments.replace_more(limit=None) # get whole CommentForest
             for comment in submission.comments.list():
                 # initialize list for current comment and append meta data + body
                 comments_list = []
                 comments_list.append(current_Time)
+                comments_list.append(s)
+                comments_list.append(submission.title.lower()) # TODO: fix encoding
                 comments_list.append(submission.id)
+                comments_list.append(submission.stickied)
                 comments_list.append(comment.id)
                 comments_list.append(comment.created_utc)
-                # TODO: fix encoding
-                comments_list.append(comment.body.lower())
+                comments_list.append(comment.body.lower()) # TODO: fix encoding
                 comments_list.append(comment.score)
+
                 # save comment to df
-                temp_df = pd.DataFrame([comments_list], columns=comments_col_header)
-                rsa_comments_df = rsa_comments_df.append(temp_df)
+                temp_df = pd.DataFrame([comments_list], columns=col_header)
+                rsa_df = rsa_df.append(temp_df)
 
-# save dfs
-rsa_subm_df.to_csv('submissions.csv', index=False)
-rsa_comments_df.to_csv('comments.csv', index=False)
+# # save dfs
+# rsa_subm_df.to_csv('submissions.csv', index=False)
+# rsa_df.to_csv('comments.csv', index=False)
 
-# azure blob config var
-blob_service_client = BlobServiceClient.from_connection_string(config.storage_string)
-blob_client = blob_service_client.get_blob_client(container=config.container_name, blob='submissions.csv')
+# connect to sql and write to db
+sql_header = 'crawl_datetime, subreddit, submission, submission_id, stickied, comment_id, created_utc, body, score'
+sql_insertion = f'INSERT INTO {config.sql_database}.dbo.{config.sql_table} ({sql_header}) values(?,?,?,?,?,?,?,?,?)'
 
-# upload to blob
-with open('submissions.csv', "rb") as data:
-    blob_client.upload_blob(data)
+with pyodbc.connect(config.sql_connection_string) as conn:
+    with conn.cursor() as cursor:
+        for index, row in rsa_df.iterrows():
+            cursor.execute(
+                sql_insertion,
+                row.crawl_datetime,
+                row.subreddit,
+                row.submission,
+                row.submission_id,
+                row.stickied,
+                row.comment_id,
+                row.created_utc,
+                row.body,
+                row.score
+            )
+
+    conn.commit()
+    cursor.close()
