@@ -29,7 +29,7 @@ col_header = [
     'crawl_datetime', 'subreddit', 'submission', 'submission_id', 'stickied',
     'comment_id', 'created_utc', 'body', 'score'
 ]
-rsa_df = pd.DataFrame(columns=col_header)
+df = pd.DataFrame(columns=col_header)
 
 for s in subs:
     for submission in reddit.subreddit(s).hot(limit=submission_limit):
@@ -51,19 +51,19 @@ for s in subs:
 
                 # save comment to df
                 temp_df = pd.DataFrame([comments_list], columns=col_header)
-                rsa_df = rsa_df.append(temp_df)
+                df = df.append(temp_df)
 
 # # save dfs
 # rsa_subm_df.to_csv('submissions.csv', index=False)
-# rsa_df.to_csv('comments.csv', index=False)
+# df.to_csv('comments.csv', index=False)
 
 # connect to sql and write to db
 sql_header = 'crawl_datetime, subreddit, submission, submission_id, stickied, comment_id, created_utc, body, score'
-sql_insertion = f'INSERT INTO {config.sql_database}.dbo.{config.sql_table} ({sql_header}) values(?,?,?,?,?,?,?,?,?)'
+sql_insertion = f'INSERT INTO {config.sql_database}.dbo.{config.sql_table_comments} ({sql_header}) values(?,?,?,?,?,?,?,?,?)'
 
 with pyodbc.connect(config.sql_connection_string) as conn:
     with conn.cursor() as cursor:
-        for index, row in rsa_df.iterrows():
+        for index, row in df.iterrows():
             cursor.execute(
                 sql_insertion,
                 row.crawl_datetime,
