@@ -1,12 +1,7 @@
-DROP TABLE IF EXISTS dbo.rsa_table;
-CREATE TABLE rsa_table (
-    crawl_datetime DATETIME,
+DROP TABLE IF EXISTS dbo.comment_table;
+CREATE TABLE comment_table (
     subreddit varchar(255),
-    submission varchar(255),
-    submission_id varchar(255),
-    stickied varchar(255),
     comment_id varchar(255),
-    created_utc FLOAT,
-    body TEXT,
-    score INT
+    created_utc DATE,
+    body TEXT
 );
