@@ -13,7 +13,7 @@ import praw
 # config vars
 current_Time = datetime.now()
 current_date = date.today().strftime(r"%Y%m%d")
-submission_limit = 2 # set number of submissions crawled per subreddit
+submission_limit = 3 # set number of submissions crawled per subreddit
 
 # get existing comment ids already in db
 exist_comment_ids = []
@@ -66,23 +66,23 @@ for s in subs:
 
 df_crawled.reset_index(drop=True, inplace=True)
 
-# connect to sql and write comments IDs to db TODO:
-# new_comment_ids = list(set(new_comment_ids))
-# new_comment_ids = [[item] for item in new_comment_ids]
+# connect to sql and write comments IDs to db
+new_comment_ids = list(set(new_comment_ids))
+new_comment_ids = [[item] for item in new_comment_ids]
 
-# sql_header = 'comment_id'
-# sql_insertion = f'INSERT INTO {config.sql_database}.dbo.{config.sql_table_comments} ({sql_header}) values(?)'
+sql_header = 'comment_id'
+sql_insertion = f'INSERT INTO {config.sql_database}.dbo.{config.sql_table_comments} ({sql_header}) values(?)'
 
-# if len(new_comment_ids) > 0:
-#     with pyodbc.connect(config.sql_connection_string) as conn:
-#         with conn.cursor() as cursor:
-#             cursor.fast_executemany = True
-#             cursor.executemany(sql_insertion, new_comment_ids)
-#         conn.commit()
-#         cursor.close()
-#     print(f'successful: new comment IDs added to db {len(new_comment_ids)}')
-# else:
-#     print('no new comments')
+if len(new_comment_ids) > 0:
+    with pyodbc.connect(config.sql_connection_string) as conn:
+        with conn.cursor() as cursor:
+            cursor.fast_executemany = True
+            cursor.executemany(sql_insertion, new_comment_ids)
+        conn.commit()
+        cursor.close()
+    print(f'successful: {len(new_comment_ids)} new comment IDs added to db')
+else:
+    print('no new comments')
 
 # TODO: filter for ticker and count
 all_ticker = []
@@ -117,9 +117,10 @@ for index, row in df_crawled.iterrows():
 df_ticker_found = pd.DataFrame(ticker_found, columns=['subreddit', 'crawl_date', 'ticker', 'amount'])
 df_ticker_found = df_ticker_found.groupby(['subreddit', 'crawl_date', 'ticker']).agg({'amount': ['sum']})
 df_ticker_found.reset_index(inplace=True)
+df_ticker_found.columns = ['subreddit', 'crawl_date', 'ticker', 'amount']
 
-print(df_ticker_found.head(15))
+print(df_ticker_found.head(10))
 
-# TODO: check with existing ticker counts
+# TODO: check with existing ticker counts and update
 
 # TODO: update db
