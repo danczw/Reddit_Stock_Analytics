@@ -3,8 +3,6 @@ from nltk.corpus import words
 import pandas as pd
 import pyodbc
 
-
-
 df = pd.read_csv('./data/ticker.csv', sep=';')
 
 ticker = list(df['ticker'])
