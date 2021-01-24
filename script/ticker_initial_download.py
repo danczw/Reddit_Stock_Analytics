@@ -4,15 +4,21 @@ import json
 import pandas as pd
 import requests
 
+import nltk
+nltk.download('words')
+from nltk.corpus import words
+word_list = words.words()
+word_list = [i.lower() for i in word_list]
+
 # define exchanges
 exchanges = [
     'F',	# DEUTSCHE BOERSE AG
-    'HK',	# HONG KONG EXCHANGES AND CLEARING LTD
-    'L',	# LONDON STOCK EXCHANGE
-    'SI',	# SINGAPORE EXCHANGE
-    'SS',	# SHANGHAI STOCK EXCHANGE
-    'SW',	# SWISS EXCHANGE
-    'T',	# TOKYO STOCK EXCHANGE-TOKYO PRO MARKET
+    # 'HK',	# HONG KONG EXCHANGES AND CLEARING LTD
+    # 'L',	# LONDON STOCK EXCHANGE
+    # 'SI',	# SINGAPORE EXCHANGE
+    # 'SS',	# SHANGHAI STOCK EXCHANGE
+    # 'SW',	# SWISS EXCHANGE
+    # 'T',	# TOKYO STOCK EXCHANGE-TOKYO PRO MARKET
     'US'	# US exchanges
 ]
 
@@ -24,7 +30,7 @@ exchanges_ticker_list = []
 for exchange in exchanges:
     r = requests.get('https://finnhub.io/api/v1/stock/symbol?exchange='+exchange+'&token='+config.finnhub_key)
     exchanges_ticker_list.append(r.json())
-    print(exchange)
+    print(f'Exchange completed: {exchange}')
 
 # convert to list of dicts by saving as json
 with open('./data/ticker.json', 'w', encoding='utf-8') as js:
@@ -38,10 +44,15 @@ with open('./data/ticker.json') as json_file:
         for ticker in exchange:
             ticker_list.append(ticker['symbol'])
 
-print(len(ticker_list))
+print(f'total list: {len(ticker_list)}')
+ticker_list = [i.replace('.F', '') for i in ticker_list]
 ticker_list = list(set(ticker_list))
-print(len(ticker_list))
+print(f'dedub list: {len(ticker_list)}')
+ticker_list = [i for i in ticker_list if len(i) > 2]
+print(f'length filtered list: {len(ticker_list)}')
+ticker_list = [i for i in ticker_list if i.lower() not in word_list]
+print(f'word filtered list: {len(ticker_list)}')
 
-# write to csv file
+# filter and write to csv file
 df = pd.DataFrame(ticker_list, columns=['ticker'])
 df.to_csv('./data/ticker.csv', sep=';', index=False)
