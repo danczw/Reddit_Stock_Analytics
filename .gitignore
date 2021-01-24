@@ -3,3 +3,6 @@ config.py
 __pycache__/config.cpython-39.pyc
 __pycache__/reddit_config.cpython-39.pyc
 script/__pycache__/config.cpython-39.pyc
+crawl_job.py
+run_crawl_job.cmd
+crawl.zip
