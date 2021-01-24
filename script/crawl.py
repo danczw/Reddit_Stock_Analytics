@@ -120,4 +120,6 @@ df_ticker_found.reset_index(inplace=True)
 
 print(df_ticker_found.head(15))
 
+# TODO: check with existing ticker counts
+
 # TODO: update db
