@@ -20,10 +20,13 @@ conn = pyodbc.connect(config.sql_connection_string)
 cursor = conn.cursor()
 cursor.fast_executemany = True
 
+comment_header = ['subreddit', 'comment_id', 'created_utc', 'body']
+rsa_header = ['subreddit', 'crawl_date', 'ticker', 'amount']
+
 # get existing comment ids already in db
 exist_comment_ids = []
 
-cursor.execute('SELECT comment_id FROM comment_table')
+cursor.execute(f'SELECT {comment_header[1]} FROM {config.sql_database}.dbo.{config.sql_table_comments}')
 for row in cursor.fetchall():
     exist_comment_ids.append(row[0])
 
@@ -34,13 +37,10 @@ reddit = praw.Reddit(
     , user_agent = config.user_agent
 )
 # define subreddits to be crawled
-subs = ['wallstreetbets'] # , 'stocks', 'Finanzen', 'mauerstrassenwetten', 'options']
+subs = ['Finanzen'] # , 'wallstreetbets', 'stocks', 'Finanzen', 'mauerstrassenwetten', 'options']
 
 # define dataframe for comments meta data + comment body
-col_header = [
-    'subreddit', 'comment_id', 'created_utc', 'body'
-]
-df_crawled = pd.DataFrame(columns=col_header)
+df_crawled = pd.DataFrame(columns=comment_header)
 new_comment_ids = []
 
 for s in subs:
@@ -58,11 +58,11 @@ for s in subs:
                     datetime.utcfromtimestamp(comment.created_utc).date()
                 )
                 comments_list.append(
-                    comment.body.lower()
+                    comment.body
                 )
 
                 # save comment to df_crawled
-                temp_df_crawled = pd.DataFrame([comments_list], columns=col_header)
+                temp_df_crawled = pd.DataFrame([comments_list], columns=comment_header)
                 df_crawled = df_crawled.append(temp_df_crawled)
                 new_comment_ids.append(comment.id)
 
@@ -72,12 +72,13 @@ df_crawled.reset_index(drop=True, inplace=True)
 new_comment_ids = list(set(new_comment_ids))
 new_comment_ids = [[item] for item in new_comment_ids]
 
-sql_header = 'comment_id'
-sql_comment_insertion = f'INSERT INTO {config.sql_database}.dbo.{config.sql_table_comments} ({sql_header}) values(?)'
-
 if len(new_comment_ids) > 0:
+    sql_comment_insertion = f"""
+        INSERT INTO {config.sql_database}.dbo.{config.sql_table_comments}
+        ({comment_header[1]}) values(?)
+    """
     cursor.executemany(sql_comment_insertion, new_comment_ids)
-    conn.commit()
+    cursor.commit()
     print(f'successful: {len(new_comment_ids)} new comment IDs added to db')
 else:
     print('no new comments')
@@ -107,32 +108,59 @@ for index, row in df_crawled.iterrows():
         .replace(']', '') \
         .replace(':', '')
     body = body.split()
+    
     for ticker in all_ticker:
-        if ticker.lower() in body:
+        if ticker in body:
             ticker_found.append([row['subreddit'], row['created_utc'], ticker, 1])
 
-rsa_header = ['subreddit', 'crawl_date', 'ticker', 'amount']
-df_ticker_found = pd.DataFrame(ticker_found
-    , columns = rsa_header
-)
-df_ticker_found = df_ticker_found.groupby(['subreddit', 'crawl_date', 'ticker']) \
-    .agg({'amount': ['sum']})
-df_ticker_found.reset_index(inplace=True)
-df_ticker_found.columns = rsa_header
+# transform ticker found to df to aggregate
+if len(ticker_found) > 0:
+    df_ticker_found = pd.DataFrame(ticker_found, columns = rsa_header)
+    df_ticker_found = df_ticker_found \
+        .groupby(['subreddit', 'crawl_date', 'ticker']) \
+        .agg({'amount': ['sum']})
+    df_ticker_found.reset_index(inplace=True)
+    df_ticker_found.columns = rsa_header
 
-# check with existing ticker counts and update
-df_ticker_exist = pd.read_sql('SELECT * FROM rsa_table', conn)
+    new_rows = []
 
-df_ticker_comb = pd.concat([df_ticker_exist, df_ticker_found])
-df_ticker_comb = df_ticker_comb.groupby(['subreddit', 'crawl_date', 'ticker']) \
-    .agg({'amount': ['sum']})
-df_ticker_comb.reset_index(inplace=True)
-df_ticker_comb.columns = rsa_header
+    # check if row (subreddit, crawl_date, ticker) already on db an merge
+    for index, row in df_ticker_found.iterrows():
+        sql_rsa_check = f"""
+            SELECT {rsa_header[3]} FROM {config.sql_database}.dbo.{config.sql_table_rsa} 
+            WHERE
+                {rsa_header[0]} = '{row[0]}' AND
+                {rsa_header[1]} = '{row[1]}' AND
+                {rsa_header[2]} = '{row[2]}'
+            """
 
-# update db
-# TODO: currently only inserted into tabel
-# TODO: check aggregation
-rsa_upload = df_ticker_comb.values.tolist()
-sql_rsa_insertion = f'INSERT INTO {config.sql_database}.dbo.{config.sql_table_rsa} ({rsa_header[0]}, {rsa_header[1]}, {rsa_header[2]}, {rsa_header[3]}) values(?,?,?,?)'
-cursor.executemany(sql_rsa_insertion, rsa_upload)
-conn.commit()
+        cursor.execute(sql_rsa_check)
+        rsa_check = cursor.fetchone()
+        if rsa_check == None:
+            rsa_check = 0
+        else:
+            rsa_check = rsa_check[0]
+
+        if rsa_check > 0:
+            sql_rsa_update = f"""
+                UPDATE {config.sql_database}.dbo.{config.sql_table_rsa}
+                SET {rsa_header[3]} = ({rsa_check} + {row[3]})
+                WHERE
+                    {rsa_header[0]} = '{row[0]}' AND
+                    {rsa_header[1]} = '{row[1]}' AND
+                    {rsa_header[2]} = '{row[2]}'
+            """
+            cursor.execute(sql_rsa_update)
+            cursor.commit()
+        else:
+            new_rows.append(row.tolist())
+    if len(new_rows) > 0:
+        sql_rsa_insertion = f"""
+            INSERT INTO {config.sql_database}.dbo.{config.sql_table_rsa} 
+            ({rsa_header[0]}, {rsa_header[1]}, {rsa_header[2]}, {rsa_header[3]}) 
+            values(?,?,?,?)
+        """
+        cursor.executemany(sql_rsa_insertion, new_rows)
+        conn.commit()
+else:
+    print('no new ticker')
