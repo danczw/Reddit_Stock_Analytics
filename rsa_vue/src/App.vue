@@ -2,12 +2,9 @@
   <div id='app'>
       <nav>
         <div class='navigation__name'>
-          <strong class='navigation__logo-emph'>S</strong>tocks 
-          <strong class='navigation__logo-emph'>R</strong>edddit thinks 
-          <strong class='navigation__logo-emph'>A</strong>bout
-        </div>
-        <div class='navigation__logo'>
-          logo placeholder
+          <strong class='navigation__name-emph'>S</strong>tocks 
+          <strong class='navigation__name-emph'>R</strong>edddit thinks 
+          <strong class='navigation__name-emph'>A</strong>bout
         </div>
       </nav>
       <hr>
@@ -15,12 +12,13 @@
 </template>
 
 <script>
-export default {
-  name: 'App',
-  data: () => ({
-    title: 'Stocks Reddit thinks about'
-  })
-}
+  export default {
+    name: 'App',
+    components: {},
+    data: () => ({
+      title: 'Stocks Reddit thinks about'
+    })
+  };
 </script>
 
 <style lang='scss'>
@@ -42,16 +40,11 @@ export default {
     .navigation__name {
       font-weight: bold;
 
-      .navigation__logo-emph {
+      .navigation__name-emph {
         color: orangered;
         font-size: 20px;
       }
     }
-
-    .navigation__logo {
-      font-weight: bold;
-    }
   }
-
 }
 </style>
